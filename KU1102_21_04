@@ -1,0 +1,211 @@
+import msvcrt
+import time
+import sys
+from collections import deque
+
+n = int(input("Masukkan jumlah lantai: "))
+isoperating = True
+
+class TimeoutExpired(Exception):
+    pass
+
+def input_with_timeout(prompt, timeout, timer=time.monotonic):
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    endtime = timer() + timeout
+    result = []
+    while timer() < endtime:
+        if msvcrt.kbhit():
+            result.append(msvcrt.getwche())
+            if result[-1] == '\r':
+                return ''.join(result[:-1])
+        time.sleep(0.04)
+    raise TimeoutExpired
+
+def calllift_display(starting_point, direction):
+    if current_floor <  starting_point:
+        for i in range(current_floor, starting_point):
+            print(f"[{i}↑]", end= "\r")
+            time.sleep(2)
+    elif current_floor > starting_point:
+        for i in range(current_floor, starting_point, -1):
+            print(f"[{i}↓]", end= "\r")
+            time.sleep(2)
+    if (direction == "up" and starting_point != n) or starting_point == 1:
+        print(f"[{starting_point}↑]")
+    elif (direction == "down" and starting_point != 1) or starting_point == n:
+        print(f"[{starting_point}↓]")
+    time.sleep(0.5)
+    print("Pintu lift akan membuka")
+
+def floor_buttons():
+    for i in range(n//5 + 1):
+        j = 1
+        while i*5+j <= n and j < 6:
+            if (i*5+j)%5 == 0 or i*5+j == n:
+                print(i*5+j)
+            else:
+                print(i*5+j, end= " | ")
+            j += 1
+        print()
+
+def buttons():
+    print("1: Tombol lantai")
+    print("2: Buka pintu lift")
+    print("3: Tutup pintu lift")
+    print("4: Tombol emergency")
+    ans = int(input("Tombol: "))
+    if ans == 1:
+        floor_buttons()
+        try:
+            destination = int(input_with_timeout("Lantai tujuan: ", 5))
+        except TimeoutExpired:
+            print("\nPintu lift akan menutup")
+        else:
+            print()
+            return destination
+    elif ans == 2:
+        print("Pintu lift akan membuka", end = "\r")
+        time.sleep(2)
+        print("Pintu lift akan menutup")
+        time.sleep(1)
+    elif ans == 3:
+        print("Pintu lift akan menutup")
+        time.sleep(1)
+    elif ans ==4:
+        print("*BEEP*")
+        time.sleep(1)
+        print("Anda akan langsung dihubungi oleh lift call service")
+        print("Lift akan berhenti untuk sementara")
+        istalking = True
+        while istalking:
+            time.sleep(3)
+            print("Apakah pembicaraan sudah selesai?")
+            ans = input("Jawaban (ya/tidak): ")
+            if ans == "ya":
+                istalking = False
+
+def additionalinput(destinations):
+    try:
+        additional_input = int(input_with_timeout("Tekan 1 untuk mengakses tombol lantai atau 4 untuk mengakses tombol emergency: ", 2,))
+        if additional_input == 1:
+            print()
+            floor_buttons()
+            additional_destination = int(input("Lantai tujuan: "))
+            print("\n")
+            isadded = True
+            for i in range(n):
+                if additional_destination == destinations[i]:
+                    isadded = False
+            if isadded:
+                return additional_destination
+        elif additional_input == 4:
+            print()
+            print("*BEEP*")
+            time.sleep(1)
+            print("Anda akan langsung dihubungi oleh lift call service")
+            print("Lift akan berhenti untuk sementara")
+            istalking = True
+            while istalking:
+                time.sleep(3)
+                print("Apakah pembicaraan sudah selesai?")
+                ans = input("Jawaban (ya/tidak): ")
+                if ans == "ya":
+                    istalking = False
+    except TimeoutExpired:
+        print()
+        return None
+
+def system(initial_destination, current_floor):
+    print("Pintu akan menutup")
+    destinations = [0 for i in range(n)]
+    destinations[0] = initial_destination
+    max_destination = initial_destination
+    min_destination = initial_destination
+    index = 1
+    j = current_floor
+    isntdone = True
+    if initial_destination > current_floor:
+        while j <= max_destination:
+            queue = deque([], 3)
+            for i in range(1, n):
+                if destinations[i] > max_destination:
+                    max_destination = destinations[i]
+            for i in range(n):
+                if j == destinations[i] and isntdone:
+                    sys.stdout.write("\x1b[2A\x1b[2K")
+                    print(f"[{j}]")
+                    print("Pintu lift akan membuka                                                                                     ", end = "\r")
+                    time.sleep(2)
+                    print("Pintu lift akan menutup")
+                    time.sleep(0.5)
+            if j == max_destination:
+                isntdone = False
+                return j
+            elif j != max_destination:
+                s = "[%d↑]" % j
+                j += 1
+                if s != None:
+                    queue.append(s)
+                else:
+                    queue.popleft()
+                for _ in range(len(queue)):
+                    sys.stdout.write("\x1b[2A\x1b[2K")
+                if len(queue) == 0:
+                    break
+                for i in range(len(queue)):
+                    sys.stdout.write(queue[i] + "\n")
+                additional_destination = additionalinput(destinations)
+                if additional_destination != None:
+                    destinations[index] = additional_destination
+                index += 1
+                time.sleep(0.5)
+    elif initial_destination < current_floor:
+        while j >= min_destination:
+            queue = deque([], 3)
+            for i in range(1, n):
+                if destinations[i] < min_destination and destinations[i] != 0:
+                    min_destination = destinations[i]
+            for i in range(n):
+                if j == destinations[i] and isntdone:
+                    sys.stdout.write("\x1b[2A\x1b[2K")
+                    print(f"[{j}]")
+                    print("Pintu lift akan membuka                                                                                     ", end = "\r")
+                    time.sleep(2)
+                    print("Pintu lift akan menutup")
+                    time.sleep(0.5)
+            if j == min_destination:
+                isntdone = False
+                return j
+            elif j != min_destination:
+                s = "[%d↓]" % j
+                j -= 1
+                if s != None:
+                    queue.append(s)
+                else:
+                    queue.popleft()
+                for _ in range(len(queue)):
+                    sys.stdout.write("\x1b[2A\x1b[2K")
+                if len(queue) == 0:
+                    break
+                for i in range(len(queue)):
+                    sys.stdout.write(queue[i] + "\n")
+                additional_destination = additionalinput(destinations)
+                if additional_destination != None:
+                    destinations[index] = additional_destination
+                index += 1
+                time.sleep(0.5)
+
+current_floor = 1
+while isoperating:
+    starting_point = int(input("Masukkan lantai Anda saat ini: "))
+    direction = input("up/down: ")
+    calllift_display(starting_point, direction)
+    current_floor = starting_point
+    time.sleep(0.5)
+    initial_destination = buttons()
+    while initial_destination == None:
+        initial_destination = buttons()
+    if initial_destination != None:
+        print()
+        current_floor = system(initial_destination, current_floor)
